@@ -5,6 +5,7 @@ use dotenv::dotenv;
 use crate::bot::Bot;
 
 mod bot;
+mod interface;
 
 #[tokio::main]
 async fn main() {
@@ -12,7 +13,7 @@ async fn main() {
     dotenv().ok();
     let token = env::var("DISCORD_BOT_TOKEN").expect("Not Found Bot Token...");
     
-    let bot = Bot::init(&token);
-    bot.get_gateway_url();
-    bot.login();
+    let mut bot = Bot::init(&token);
+    bot.get_gateway_url().await;
+    // bot.login();
 }
