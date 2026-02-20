@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+// Websocket接続用URL要求時のレスポンスオブジェクト
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GatewayResponse {
     pub url: String,
@@ -12,4 +13,19 @@ pub struct SessionStartLimit {
     pub remaining: u32,
     pub reset_after: u64,
     pub max_concurrency: u32,
+}
+
+// Websocket接続時のレスポンスオブジェクト
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Opcode10 {
+    pub t: Option<String>,
+    pub s: Option<i32>,
+    pub op: i32,
+    pub d: D
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct D {
+    pub heartbeat_interval: i32,
+    pub _trace: Vec<String>
 }
