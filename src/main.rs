@@ -6,6 +6,7 @@ use crate::bot::Bot;
 
 mod bot;
 mod interface;
+mod opcode_event;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

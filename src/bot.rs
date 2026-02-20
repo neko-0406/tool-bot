@@ -1,4 +1,5 @@
 use crate::interface::{GatewayResponse, Opcode};
+use crate::opcode_event::opcode10_event;
 use anyhow::Context;
 use futures_util::stream::StreamExt;
 use reqwest::{header::{self, HeaderMap, HeaderName, HeaderValue}, Client, Url};
@@ -37,7 +38,10 @@ impl Bot {
                 Ok(Message::Text(text)) => {
                     let data_str = str::from_utf8(&text.as_bytes())?;
                     let serialized_data = serde_json::from_str::<Opcode>(&data_str)?;
-                    
+                    match serialized_data.op {
+                        10 => opcode10_event(&serialized_data).await?,
+                        _ => {}
+                    }
                 },
                 Ok(Message::Close(_)) => {break;},
                 Err(error) => {
@@ -46,6 +50,10 @@ impl Bot {
                 },
                 _ => { break; }
                 
+            }
+            // 終了フラグがtrueなら終了
+            if self.shutdown {
+                break;
             }
         }
         Ok(())
