@@ -13,7 +13,6 @@ async fn main() {
     dotenv().ok();
     let token = env::var("DISCORD_BOT_TOKEN").expect("Not Found Bot Token...");
     
-    let mut bot = Bot::init(&token);
-    bot.get_gateway_url().await;
-    // bot.login();
+    let bot = Bot::init(&token);
+    bot.login().await;
 }

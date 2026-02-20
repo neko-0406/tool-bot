@@ -1,11 +1,12 @@
+use futures_util::stream::StreamExt;
 use std::env;
 use std::str::FromStr;
 use reqwest::{Url, header::{self, HeaderMap, HeaderName, HeaderValue}, Client};
+use tokio_tungstenite::connect_async;
 use crate::interface::GatewayResponse;
 
 pub struct Bot {
     pub auth_value: String,
-    pub websocket_url: String,
     pub shutdown: bool,
 }
 
@@ -14,28 +15,48 @@ impl Bot {
         let auth_value = format!("Bot {}", token);
         Self {
             auth_value,
-            websocket_url: String::new(),
             shutdown: false,
         }
     }
 
-    pub fn login(&self) {}
+    pub async fn login(&self) {
+        // websocket用URLの取得
+        let gateway_url = match self.get_gateway_url().await {
+            Some(gateway_response) => { gateway_response.url + "v=10&encoding=json" },
+            None => { String::new() }
+        };
 
-    pub async fn get_gateway_url(&mut self) {
+        if gateway_url.is_empty() {
+            println!("failed to get websocket url..");
+            return;
+        }
+
+        // Gatewayに接続
+        let (websocket_stream, _) = connect_async(&gateway_url)
+            .await
+            .expect("WebSocket接続に失敗しました");
+        println!("WebSocket is connected!!");
+
+        let (mut write, mut read) = websocket_stream.split();
+
+        let msg = read.next().await.unwrap().unwrap();
+        println!("{:#?}", msg);
+    }
+
+    async fn get_gateway_url(&self) -> Option<GatewayResponse> {
         // gateway_url取得用のURLを作成
         let end_point = env::var("DISCORD_API_END_POINT").expect("discord endpoint is not found..");
         let gateway_url = Url::parse(&format!("{}{}", end_point, "/gateway/bot"))
             .expect("failed to create endpoint url...");
 
         // 認証用の値
-        let auth_value = self.auth_value.as_str();
         // user-agent用の値
         let repository_url = env::var("REPOSITORY_URL").expect("repository url is not found..");
         let bot_version = env::var("BOT_VERSION").expect("bot version is not found..");
         let user_agent = format!("DiscordBot ({}, {})", &repository_url, &bot_version);
         // headerの作成
         let mut headers = HeaderMap::new();
-        headers.insert(header::AUTHORIZATION, HeaderValue::from_str(auth_value).expect("failed to create header"));
+        headers.insert(header::AUTHORIZATION, HeaderValue::from_str(&self.auth_value).expect("failed to create header"));
         headers.insert(HeaderName::from_str("content-type").unwrap(), HeaderValue::from_str("application/json").expect("failed to create header"));
         headers.insert(header::USER_AGENT, HeaderValue::from_str(&user_agent).expect("failed to create user agent"));
 
@@ -50,8 +71,9 @@ impl Bot {
         // responseが成功したら展開
         if let Ok(response) = response {
             let json = response.json::<GatewayResponse>().await.expect("failed to serialize gateway response..");
-            self.websocket_url = json.url;
-            // println!("{:#?}", json);
+            Some(json)
+        } else {
+            None
         }
     }
 }
