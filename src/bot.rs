@@ -2,8 +2,8 @@ use futures_util::stream::StreamExt;
 use std::env;
 use std::str::FromStr;
 use reqwest::{Url, header::{self, HeaderMap, HeaderName, HeaderValue}, Client};
-use tokio_tungstenite::connect_async;
-use crate::interface::GatewayResponse;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
+use crate::interface::{GatewayResponse, Opcode10};
 
 pub struct Bot {
     pub auth_value: String,
@@ -22,7 +22,7 @@ impl Bot {
     pub async fn login(&self) {
         // websocket用URLの取得
         let gateway_url = match self.get_gateway_url().await {
-            Some(gateway_response) => { gateway_response.url + "v=10&encoding=json" },
+            Some(gateway_response) => { gateway_response.url + "/?v=10&encoding=json" },
             None => { String::new() }
         };
 
@@ -39,8 +39,31 @@ impl Bot {
 
         let (mut write, mut read) = websocket_stream.split();
 
-        let msg = read.next().await.unwrap().unwrap();
-        println!("{:#?}", msg);
+        while let Some(message) = read.next().await {
+            match message {
+                Ok(Message::Text(text)) => {
+                    if let Ok(text) = str::from_utf8(&text.as_bytes()) {
+                        let json_data = serde_json::from_str::<Opcode10>(text);
+                        match json_data {
+                            Ok(data) => {println!("{:#?}", data)},
+                            Err(error) => {
+                                println!("{:#?}", error.to_string());
+                                continue;
+                            }
+                        }
+                    }
+                },
+                Ok(Message::Close(_)) => {break;},
+                Err(error) => {
+                    println!("{:#?}", error.to_string());
+                    break;
+                },
+                _ => { break; }
+                
+            }
+        }
+        // let msg = read.next().await.unwrap().unwrap();
+        // println!("{:#?}", msg);
     }
 
     async fn get_gateway_url(&self) -> Option<GatewayResponse> {

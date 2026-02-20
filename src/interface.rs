@@ -21,7 +21,7 @@ pub struct Opcode10 {
     pub t: Option<String>,
     pub s: Option<i32>,
     pub op: i32,
-    pub d: D
+    pub d: serde_json::Value
 }
 
 #[derive(Debug, Serialize, Deserialize)]
