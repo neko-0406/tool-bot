@@ -17,7 +17,7 @@ pub struct SessionStartLimit {
 
 // Websocket接続時のレスポンスオブジェクト
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Opcode10 {
+pub struct Opcode {
     pub t: Option<String>,
     pub s: Option<i32>,
     pub op: i32,
@@ -25,7 +25,7 @@ pub struct Opcode10 {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct D {
+pub struct Op10 {
     pub heartbeat_interval: i32,
     pub _trace: Vec<String>
 }
