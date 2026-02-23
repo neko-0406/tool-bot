@@ -29,3 +29,9 @@ pub struct Op10 {
     pub heartbeat_interval: i32,
     pub _trace: Vec<String>
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Op1 {
+    pub op: u8,
+    pub d: Option<i32>
+}

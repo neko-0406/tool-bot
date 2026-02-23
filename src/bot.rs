@@ -1,15 +1,19 @@
 use crate::interface::{GatewayResponse, Opcode};
-use crate::opcode_event::opcode10_event;
 use anyhow::Context;
 use futures_util::stream::StreamExt;
+use futures_util::SinkExt;
 use reqwest::{header::{self, HeaderMap, HeaderName, HeaderValue}, Client, Url};
 use std::env;
 use std::str::FromStr;
+use std::sync::atomic::AtomicI32;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 pub struct Bot {
     pub auth_value: String,
     pub shutdown: bool,
+    pub sequential_num: Arc<AtomicI32>
 }
 
 impl Bot {
@@ -17,6 +21,7 @@ impl Bot {
         let auth_value = format!("Bot {}", token);
         Self {
             auth_value,
+            sequential_num: Arc::new(AtomicI32::new(-1)),
             shutdown: false,
         }
     }
@@ -31,16 +36,36 @@ impl Bot {
             .with_context(|| "failed to connect websocket")?;
         println!("WebSocket is connected!!");
 
+        // WebSocketの通信に使うオブジェクト
         let (mut write, mut read) = websocket_stream.split();
+        // スレッド間通信に使うオブジェクト
+        let (sender, mut listener) = mpsc::channel::<Message>(64);
 
+        // ここで別のスレットからのメッセージを確認
+        tokio::task::spawn( async move {
+            while let Some(message) = listener.recv().await {
+                if message.is_text() {
+                    match write.send(message).await {
+                        Ok(_) => {println!("op1 is send!!")},
+                        Err(error) => {
+                            println!("{:#?}", error);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        // メインのWebSocketメッセージ受信用のループ
         while let Some(message) = read.next().await {
             match message {
                 Ok(Message::Text(text)) => {
                     let data_str = str::from_utf8(&text.as_bytes())?;
                     let serialized_data = serde_json::from_str::<Opcode>(&data_str)?;
+                    println!("{:#?}", &serialized_data);
                     match serialized_data.op {
-                        10 => opcode10_event(&serialized_data).await?,
-                        _ => {}
+                        10 => { self.opcode10_event(&serialized_data, sender.clone()).await?; },
+                        _ => { continue; }
                     }
                 },
                 Ok(Message::Close(_)) => {break;},
